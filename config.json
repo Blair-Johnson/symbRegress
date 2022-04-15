@@ -142,15 +142,7 @@
 	   "entropy_gamma" : 1.0,
   
 	   // Whether to compute TensorBoard summaries.
-	   "summary" : false,
-
-	   // Key training hyperparams
-	   // Priority queue training hyperparameters.
-	   "pqt" : false,
-	   "pqt_k" : 10,
-	   "pqt_batch_size" : 1,
-	   "pqt_weight" : 200.0,
-	   "pqt_use_pg" : false
+	   "summary" : false
 
 	},
   

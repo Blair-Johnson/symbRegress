@@ -10,45 +10,6 @@ Batch = namedtuple(
     "Batch", ["actions", "obs", "priors", "lengths", "rewards", "on_policy"])
 
 
-def make_queue(controller=None, priority=False, capacity=np.inf, seed=0):
-    """Factory function for various Queues.
-
-    Parameters
-    ----------
-    controller : dso.controller.Controller
-        Reference to the Controller, used to compute probabilities of items in
-        the Queue.
-
-    priority : bool
-        If True, returns an object inheriting UniquePriorityQueue. Otherwise,
-        returns an object inheriting from UniqueQueue.
-
-    capacity : int
-        Maximum queue length.
-
-    seed : int
-        RNG seed used for random sampling.
-
-    Returns
-    -------
-    queue : ProgramQueue
-        Dynamic class inheriting from ProgramQueueMixin and a Queue subclass.
-    """
-
-    if priority:
-        Base = UniquePriorityQueue
-    else:
-        Base = UniqueQueue
-
-    class ProgramQueue(ProgramQueueMixin, Base):
-        def __init__(self, controller, capacity, seed):
-            ProgramQueueMixin.__init__(self, controller)
-            Base.__init__(self, capacity, seed)
-
-    queue = ProgramQueue(controller, capacity, seed)
-    return queue
-
-
 def get_samples(batch, key):
     """
     Returns a sub-Batch with samples from the given indices.

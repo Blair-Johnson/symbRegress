@@ -8,7 +8,7 @@ import tensorflow as tf
 import numpy as np
 
 from cores.program import Program, from_tokens
-from cores.memory import Batch, make_queue
+from cores.memory import Batch
 from helpers.train_stats import StatsLogger
 from helpers.utils import empirical_entropy, get_duration
 
@@ -181,14 +181,6 @@ def learn(sess, controller, pool, gp_controller, output_file,
             tvars_vals = sess.run(tvars)
             for var, val in zip(tvars, tvars_vals):
                 print(var.name, "mean:", val.mean(), "var:", val.var())
-
-    # Create the priority queue
-    k = controller.pqt_k
-    if controller.pqt and k is not None and k > 0:
-        priority_queue = make_queue(priority=True, capacity=k)
-    else:
-        priority_queue = None
-
 
     if debug >= 1:
         print("\nInitial parameter means:")
@@ -416,13 +408,6 @@ def learn(sess, controller, pool, gp_controller, output_file,
 
     #Save all results available only after all epochs are finished. Also return metrics to be added to the summary file
     results_add = logger.save_results(positional_entropy, top_samples_per_batch, r_history, pool, epoch, nevals)
-
-    # Print the priority queue at the end of training
-    if verbose and priority_queue is not None:
-        for i, item in enumerate(priority_queue.iter_in_order()):
-            print("\nPriority queue entry {}:".format(i))
-            p = Program.cache[item[0]]
-            p.print_stats()
 
     # Close the pool
     if pool is not None:

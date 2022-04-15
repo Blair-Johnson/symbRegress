@@ -388,12 +388,6 @@ class Controller(object):
                 # Loss already is set to entropy loss
                 loss += pg_loss
 
-            # Priority queue training loss
-            if pqt:
-                pqt_neglogp, _ = make_neglogp_and_entropy(self.pqt_batch_ph)
-                pqt_loss = pqt_weight * tf.reduce_mean(pqt_neglogp, name="pqt_loss")
-                loss += pqt_loss
-
             self.loss = loss
 
         def make_optimizer(name, learning_rate):
