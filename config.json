@@ -151,61 +151,14 @@
 	"prior": {
 	   // Whether to count number of constraints (useful diagnostic but has some overhead)
 	   "count_constraints" : false,
- 
-	   // Generic constraint that [targets] cannot be the [relationship] of
-	   // [effectors]. See prior.py for supported relationships.
-	   "relational" : {
-		  "targets" : [],
-		  "effectors" : [],
-		  "relationship" : null,
-		  "on" : false
-	   },
- 		// Memory sanity value. Limit strings to size 256
+
+  		// Memory sanity value. Limit strings to size 256
 		// This can be set very high, but it runs slower.
 		// Max value is 1000. 
 		"length" : {
 			"min_" : 4,
 			"max_" : 256,
 			"on" : true
-		 },
-		 // Memory sanity value. Have at most 10 optimizable constants. 
-		 // This can be set very high, but it runs rather slow. 
-		 "repeat" : {
-			"tokens" : "const",
-			"min_" : null,
-			"max_" : 3,
-			"on" : false
-		 },
-		
-		 // Prevents consecutive inverse unary operators, e.g. log(exp(x)).
-		"inverse" : {
-			"on" : false
-		 },
-		 // Prevents nested trig operators (e.g. sin(1 + cos(x))).
-		 "trig" : {
-			"on" : false
-		 },
-		 // Prevents "const" from being the only child, e.g. sin(const) or
-	   // add(const, const).
-		 "const" : {
-			"on" : false
-		 },
- 	   // Prevents expressions with no input variables, e.g. sin(1.0 + const).
-		"no_inputs" : {
-			"on" : false
-		 },
-   
-		 // Uniform arity prior: the prior probabilities over arities is uniform.
-		 "uniform_arity" : {
-			"on" : false
-		 },
-   
-		 // Soft length prior: expressions are discouraged to have length far from
-		 // loc.
-		 "soft_length" : {
-			"loc" : 10,
-			"scale" : 5,
-			"on" : false
 		 }
 	},
 
