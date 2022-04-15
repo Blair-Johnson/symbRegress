@@ -3,16 +3,12 @@
 import os
 import ast
 import itertools
-from pkg_resources import resource_filename
 import zlib
 
-import click
 import pandas as pd
 import numpy as np
 
 from cores.functions import function_map
-
-
 class BenchmarkDataset(object):
     """
     Class used to generate (X, y) data from a named benchmark expression.
@@ -222,53 +218,3 @@ class BenchmarkDataset(object):
             plt.close()
         else:
             print("WARNING: Plotting only supported for 2D datasets.")
-
-# @click.command()
-# @click.argument("benchmark_source", default="benchmarks.csv")
-# @click.option('--plot', is_flag=True)
-# @click.option('--save_csv', is_flag=True)
-# @click.option('--sweep', is_flag=True)
-
-# def main(benchmark_source, plot, save_csv, sweep):
-#     """Plots all benchmark expressions."""
-
-#     regression_path = "../../data/" #resource_filename("dso.task", "regression/")
-#     benchmark_path = os.path.join(regression_path, benchmark_source)
-#     save_dir = os.path.join(regression_path, 'log')
-#     df = pd.read_csv(benchmark_path, encoding="ISO-8859-1")
-#     names = df["name"].to_list()
-#     for name in names:
-
-#         if not name.startswith("Nguyen") and not name.startswith("Constant") and not name.startswith("Custom"):
-#             continue
-
-#         datasets = []
-
-#         # Noiseless
-#         d = BenchmarkDataset(
-#             name=name,
-#             benchmark_source=benchmark_source)
-#         datasets.append(d)
-
-#         # Generate all combinations of noise levels and dataset size multipliers
-#         if sweep and name.startswith("Nguyen"):
-#             noises = [0.0, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.10]
-#             dataset_size_multipliers = [1.0, 10.0]
-#             for noise in noises:
-#                 for dataset_size_multiplier in dataset_size_multipliers:
-#                     d = BenchmarkDataset(
-#                         name=name,
-#                         benchmark_source=benchmark_source,
-#                         noise=noise,
-#                         dataset_size_multiplier=dataset_size_multiplier,
-#                         backup=save_csv,
-#                         logdir=save_dir)
-#                     datasets.append(d)
-
-#         # Plot and/or save datasets
-#         for dataset in datasets:
-#             if plot and dataset.X_train.shape[1] == 1:
-#                 dataset.plot(save_dir)
-
-# if __name__ == "__main__":
-#     main()

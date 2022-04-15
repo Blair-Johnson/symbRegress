@@ -8,7 +8,10 @@ from cores.library import Library
 from cores.program import Program
 from cores.subroutines import parents_siblings
 from cores.functions import create_tokens
-from data_processors.dataset import BenchmarkDataset
+
+import sys
+sys.path.append("../")
+from data.dataset import BenchmarkDataset
 
 class RegressionTask:
     """
