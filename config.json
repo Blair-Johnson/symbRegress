@@ -1,0 +1,226 @@
+{
+	// Experiment configuration.
+	"experiment" : {
+ 
+	   // Root directory to save results.
+	   "logdir" : "./log",
+ 
+	   // Random number seed. Don't forget to change this for multiple runs!
+	   "seed" : 0
+	},
+
+	"task" : {  
+		// This can either be (1) the name of the benchmark dataset (see
+		// benchmarks.csv for a list of supported benchmarks) or (2) a path to a
+		// CSV file containing the data.
+		"dataset" : "Nguyen-1",
+  
+		// To customize a function set, edit this! See functions.py for a list of
+		// supported functions. Note "const" will add placeholder constants that
+		// will be optimized within the training loop. This will considerably
+		// increase runtime.
+		"function_set": ["add", "sub", "mul", "div", "sin", "cos", "exp", "log"],
+  
+		// Metric to be used for the reward function. See regression.py for
+		// supported metrics.
+		"metric" : "inv_nrmse",
+		"metric_params" : [1.0],
+  
+		// Optional alternate metric to be used at evaluation time.
+		"extra_metric_test" : null,
+		"extra_metric_test_params" : [],
+  
+		// NRMSE threshold for early stopping. This is useful for noiseless
+		// benchmark problems when DSO discovers the true solution.
+		"threshold" : 1e-12,
+  
+		// With protected=false, floating-point errors (e.g. log of negative
+		// number) will simply returns a minimal reward. With protected=true,
+		// "protected" functions will prevent floating-point errors, but may
+		// introduce discontinuities in the learned functions.      
+		"protected" : false,
+  
+		// You can add artificial reward noise directly to the reward function.
+		// Note this does NOT add noise to the dataset.
+		"reward_noise" : 0.0,
+		"reward_noise_type" : "r",
+		"normalize_variance" : false,
+  
+		// Set of thresholds (shared by all input variables) for building
+		// decision trees. Note that no StateChecker will be added to Library
+		// if decision_tree_threshold_set is an empty list or null.
+		"decision_tree_threshold_set" : []
+	 },
+
+	// Hyperparameters related to the main training loop.
+	"training" : {
+ 
+	   // These parameters control the length of the run. Specify exactly one of
+	   // [n_epochs, n_samples]. The other must be null.
+	   "n_epochs" : null,
+	   "n_samples" : 2000000,
+	   "batch_size" : 500,
+ 
+	   // To use the risk-seeking policy gradient, set epsilon < 1.0 and
+	   // baseline="R_e"
+	   "epsilon" : 0.02,
+	   "baseline" : "R_e",
+ 
+	   // Control variate parameters for vanilla policy gradient. If risk-seeking
+	   // is used, these have no effect.
+	   "alpha" : 0.5,
+	   "b_jumpstart" : false,
+ 
+	   // Number of cores to use when evaluating a batch of rewards. For batch
+	   // runs using run.py and --runs > 1, this will be overridden to 1. For
+	   // single runs, recommended to set this to as many cores as you can use!
+	   "n_cores_batch" : 2,
+ 
+	   // The complexity measure is only used to compute a Pareto front. It does
+	   // not affect the optimization.
+	   "complexity" : "token",
+ 
+	   // The constant optimizer used to optimized each "const" token.
+	   "const_optimizer" : "scipy",
+	   "const_params" : {},
+	   "verbose" : true,
+ 
+	   // Debug level
+	   "debug" : 0,
+ 
+	   // Whether to stop early if success condition is met
+	   "early_stopping" : true,
+ 
+	   // Size of the "hall of fame" (top performers during training) to save.
+	   "hof" : 100,
+ 
+	   // EXPERIMENTAL: Hyperparameters related to utilizing a memory buffer.
+	   "use_memory" : false,
+	   "memory_capacity" : 1e3,
+	   "warm_start" : null,
+	   "memory_threshold" : null,
+ 
+	   // Parameters to control what outputs to save.
+	   "save_all_epoch" : false,
+	   "save_summary" : false,
+	   "save_positional_entropy" : false,
+	   "save_pareto_front" : true,
+	   "save_cache" : false,
+	   "save_cache_r_min" : 0.9,
+	   "save_freq" : 1,
+	   "save_token_count" : false
+
+	},
+	// The State Manager defines the inputs to the Controller
+	"state_manager": {
+		  "type" : "hierarchical",
+		  // Observation hyperparameters
+		  "observe_action" : false,
+		  "observe_parent" : true,
+		  "observe_sibling" : true,
+		  "observe_dangling" : false,
+		  "embedding" : false,
+		  "embedding_size" : 8
+	},
+	// Hyperparameters related to the RNN distribution over objects.
+	"controller" : {
+	   // Maximum sequence length.
+	   "max_length" : 256,
+ 
+	   // RNN architectural hyperparameters.
+	   "cell" : "lstm",
+	   "num_layers" : 1,
+	   "num_units" : 16,
+	   "initializer" : "zeros",
+ 
+	   // Optimizer hyperparameters.
+	   "learning_rate": 0.0025,
+	   "optimizer" : "adam",
+ 
+	   // Entropy regularizer hyperparameters.
+	   "entropy_weight" : 0.005,
+	   "entropy_gamma" : 1.0,
+  
+	   // Whether to compute TensorBoard summaries.
+	   "summary" : false,
+
+	   // Key training hyperparams
+	   // Priority queue training hyperparameters.
+	   "pqt" : false,
+	   "pqt_k" : 10,
+	   "pqt_batch_size" : 1,
+	   "pqt_weight" : 200.0,
+	   "pqt_use_pg" : false
+
+	},
+  
+	// Hyperparameters related to including in situ priors and constraints. Each
+	// prior must explicitly be turned "on" or it will not be used.
+	"prior": {
+	   // Whether to count number of constraints (useful diagnostic but has some overhead)
+	   "count_constraints" : false,
+ 
+	   // Generic constraint that [targets] cannot be the [relationship] of
+	   // [effectors]. See prior.py for supported relationships.
+	   "relational" : {
+		  "targets" : [],
+		  "effectors" : [],
+		  "relationship" : null,
+		  "on" : false
+	   },
+ 		// Memory sanity value. Limit strings to size 256
+		// This can be set very high, but it runs slower.
+		// Max value is 1000. 
+		"length" : {
+			"min_" : 4,
+			"max_" : 256,
+			"on" : true
+		 },
+		 // Memory sanity value. Have at most 10 optimizable constants. 
+		 // This can be set very high, but it runs rather slow. 
+		 "repeat" : {
+			"tokens" : "const",
+			"min_" : null,
+			"max_" : 3,
+			"on" : false
+		 },
+		
+		 // Prevents consecutive inverse unary operators, e.g. log(exp(x)).
+		"inverse" : {
+			"on" : false
+		 },
+		 // Prevents nested trig operators (e.g. sin(1 + cos(x))).
+		 "trig" : {
+			"on" : false
+		 },
+		 // Prevents "const" from being the only child, e.g. sin(const) or
+	   // add(const, const).
+		 "const" : {
+			"on" : false
+		 },
+ 	   // Prevents expressions with no input variables, e.g. sin(1.0 + const).
+		"no_inputs" : {
+			"on" : false
+		 },
+   
+		 // Uniform arity prior: the prior probabilities over arities is uniform.
+		 "uniform_arity" : {
+			"on" : false
+		 },
+   
+		 // Soft length prior: expressions are discouraged to have length far from
+		 // loc.
+		 "soft_length" : {
+			"loc" : 10,
+			"scale" : 5,
+			"on" : false
+		 }
+	},
+
+	// Postprocessing hyperparameters.
+	"postprocess" : {
+	   "show_count" : 5,
+	   "save_plots" : true
+	}
+}
+ 
