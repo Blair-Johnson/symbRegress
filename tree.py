@@ -54,6 +54,18 @@ class SyntaxNode(object):
         else:
             return False
 
+    def preorder_node(self, node_list: list) -> list:
+        if self.n_args == 2:
+            self.left = SyntaxNode(node_list.pop(0))
+            node_list = self.left.preorder_node(node_list)
+            self.right = SyntaxNode(node_list.pop(0))
+            return self.right.preorder_node(node_list)
+        elif self.n_args == 1:
+            self.left = SyntaxNode(node_list.pop(0))
+            return self.left.preorder_node(node_list)
+        else:
+            return node_list
+
     def get_function(self, X: torch.Tensor) -> Callable:
         if self.n_args == 1:
             return self.op(self.left.get_function(X))
@@ -82,6 +94,12 @@ def get_expression(root:SyntaxNode) -> str:
     else:
         return '('+ get_expression(root.left) + root.value + get_expression(root.right) + ')'       
 
+def tree_from_preorder(preorder : list) -> SyntaxNode:
+    root = preorder.pop(0)
+    for node_id in preorder:
+        root.add_node(node_id)
+    return root
+
 if __name__ == '__main__':
     # lambda x: exp(ax + b)
     root = SyntaxNode("exp") # exp
@@ -94,6 +112,10 @@ if __name__ == '__main__':
     print(root.get_function(x))
     print(root.get_preorder())
     print(get_expression(root))
+    print('reconstruction test')
+    root2 = SyntaxNode("exp")
+    assert root2.preorder_node(['+','*','const','var','const']) == []
+    print(get_expression(root2))
 
 
     
