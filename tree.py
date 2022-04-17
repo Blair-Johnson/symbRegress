@@ -54,15 +54,15 @@ class SyntaxNode(object):
         else:
             return False
 
-    def preorder_node(self, node_list: list) -> list:
+    def from_preorder(self, node_list: list) -> list:
         if self.n_args == 2:
             self.left = SyntaxNode(node_list.pop(0))
-            node_list = self.left.preorder_node(node_list)
+            node_list = self.left.from_preorder(node_list)
             self.right = SyntaxNode(node_list.pop(0))
-            return self.right.preorder_node(node_list)
+            return self.right.from_preorder(node_list)
         elif self.n_args == 1:
             self.left = SyntaxNode(node_list.pop(0))
-            return self.left.preorder_node(node_list)
+            return self.left.from_preorder(node_list)
         else:
             return node_list
 
@@ -114,7 +114,7 @@ if __name__ == '__main__':
     print(get_expression(root))
     print('reconstruction test')
     root2 = SyntaxNode("exp")
-    assert root2.preorder_node(['+','*','const','var','const']) == []
+    assert root2.from_preorder(['+','*','const','var','const']) == []
     print(get_expression(root2))
 
 
