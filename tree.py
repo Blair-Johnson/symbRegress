@@ -74,6 +74,14 @@ class SyntaxNode(object):
             traversal += self.right.get_preorder()
         return traversal
 
+def get_expression(root:SyntaxNode) -> str:
+    if root.left == None and root.right == None:
+        return root.value
+    elif root.right == None:
+        return root.value + '(' + get_expression(root.left) + ')'
+    else:
+        return '('+ get_expression(root.left) + root.value + get_expression(root.right) + ')'       
+
 if __name__ == '__main__':
     # lambda x: exp(ax + b)
     root = SyntaxNode("exp") # exp
@@ -85,6 +93,7 @@ if __name__ == '__main__':
     x = torch.tensor(3.5)
     print(root.get_function(x))
     print(root.get_preorder())
+    print(get_expression(root))
 
 
     
