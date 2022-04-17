@@ -5,36 +5,49 @@ import torch.nn.functional as nf
 from typing import Callable
 
 class SyntaxNode(object):
-    def __init__(self, op_idx: int, parent = None):
+    # stored op properties in class attribute
+    n_args = {
+        "+": 2,
+        "-": 2,
+        "*": 2,
+        "/": 2,
+        "sin": 1,
+        "cos": 1,
+        "exp": 1,
+        "log": 1,
+        "var": 0,
+        "const": 0}
+
+    op_list = {
+        "+": torch.add,
+        "-": torch.subtract,
+        "*": torch.multiply,
+        "/": torch.divide,
+        "sin": torch.sin,
+        "cos": torch.cos,
+        "exp": torch.exp,
+        "log": torch.log,
+        "var": None,
+        "const": torch.rand(1, requires_grad=True)}
+
+    def __init__(self, op: str, parent = None):
         self.left = None
         self.right = None
         self.parent = parent
-        self.op_idx = op_idx
-        
-        # stored op properties
-        arg_list = [2,2,2,2,1,1,1,1,0,0]
-        op_list = [torch.add,
-                        torch.subtract,
-                        torch.multiply,
-                        torch.divide,
-                        torch.sin,
-                        torch.cos,
-                        torch.exp,
-                        torch.log,
-                        None,
-                        torch.rand(1, requires_grad=True)]
-        
-        # operation, numper of arguments
-        self.op = op_list[self.op_idx]
-        self.n_args = arg_list[self.op_idx]
+        assert op in SyntaxNode.op_list.keys()
+        self.value = op
+            
+        # operation, number of arguments
+        self.op = SyntaxNode.op_list[op]
+        self.n_args = SyntaxNode.n_args[op]
 
-    def add_node(self, node_idx : int) -> bool:
+    def add_node(self, node_value : str) -> bool:
         if self.n_args != 0:
             if self.left == None:
-                self.left = SyntaxNode(node_idx, self)
+                self.left = SyntaxNode(node_value, self)
                 return True
             elif (self.n_args != 1) and (self.right == None):
-                self.right = SyntaxNode(node_idx, self)
+                self.right = SyntaxNode(node_value, self)
                 return True
             else:
                 return False
@@ -54,24 +67,33 @@ class SyntaxNode(object):
                 return X
 
     def get_preorder(self) -> list:
-        indices = [self.op_idx]
+        traversal = [self.value]
         if self.left != None:
-            indices += self.left.get_preorder()
+            traversal += self.left.get_preorder()
         if self.right != None:
-            indices += self.right.get_preorder()
-        return indices
+            traversal += self.right.get_preorder()
+        return traversal
+
+def get_expression(root:SyntaxNode) -> str:
+    if root.left == None and root.right == None:
+        return root.value
+    elif root.right == None:
+        return root.value + '(' + get_expression(root.left) + ')'
+    else:
+        return '('+ get_expression(root.left) + root.value + get_expression(root.right) + ')'       
 
 if __name__ == '__main__':
     # lambda x: exp(ax + b)
-    root = SyntaxNode(6) # exp
-    root.add_node(0) # exp( + )
-    root.left.add_node(2) # exp(( * ) + )
-    root.left.add_node(9) # exp(( * ) + b)
-    root.left.left.add_node(9) # exp((a * ) + b)
-    root.left.left.add_node(8) # exp((a * x) + b)
+    root = SyntaxNode("exp") # exp
+    root.add_node("+") # exp( + )
+    root.left.add_node("*") # exp(( * ) + )
+    root.left.add_node("const") # exp(( * ) + b)
+    root.left.left.add_node("const") # exp((a * ) + b)
+    root.left.left.add_node("var") # exp((a * x) + b)
     x = torch.tensor(3.5)
     print(root.get_function(x))
     print(root.get_preorder())
+    print(get_expression(root))
 
 
     
