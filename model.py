@@ -1,12 +1,12 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as nf
+from tree import *
 
 from torch.distributions.categorical import Categorical
 from tree import SyntaxNode, tree_from_preorder
 
 N_SAMPLES = 20
-
 
 class SyntaxTreeLSTM(nn.Module):
     
@@ -36,8 +36,14 @@ class SyntaxTreeLSTM(nn.Module):
         self.lstm2 = nn.LSTMCell(128, 128)
         self.class_head = nn.Linear(128, 9)
         
+
     def stop_criterion(self, tree: SyntaxNode) -> bool:
         '''Test to see if tree is complete'''
+        leaf_list = tree.get_leaf_nodes()
+        for leaf in leaf_list:
+            if leaf.n_args != 0:
+                return False
+        return True
 
     def update_tree(self, tree: SyntaxNode, node_logits: torch.tensor) -> SyntaxTree:
         '''Sample new token from distribution, ignore illegal choices, update tree'''

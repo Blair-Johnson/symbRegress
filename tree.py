@@ -100,6 +100,16 @@ class SyntaxNode(object):
             traversal += self.right.get_preorder()
         return traversal
 
+    def get_leaf_nodes(self) -> list:
+        leaf_list = []
+        if self.left is None and self.right is None:
+            leaf_list.append(self)
+        else:
+            leaf_list += self.left.get_leaf_nodes()
+            if self.right is not None:
+                leaf_list += self.right.get_leaf_nodes()
+        return leaf_list
+    
     def get_last(self):
         if self.n_args == 2:
             if self.left != None:
@@ -151,14 +161,25 @@ if __name__ == '__main__':
     print(root.get_function(x))
     print(root.get_preorder())
     print(get_expression(root))
-    print('reconstruction test')
+
+    print('reconstruction test:')
     root2 = SyntaxNode("exp")
     assert root2.from_preorder(['+','*','const','var','const']) == []
     print(get_expression(root2))
-    print('last node test')
+
+    print('Last node test:')
     print('const + exp(?)')
     preorder = ['+','const','exp']
     tree = tree_from_preorder(preorder)
     print(tree.get_last().op)
 
+    print("Non-empty list test:")
+    root3 = SyntaxNode("exp")
+    l = root3.from_preorder(['+','*','const','var','const', "*", "+"])
+    print("l:", l)
+    print("root3:", get_expression(root3))
     
+    print("Leaf nodes test:")    
+    leafs = root3.get_leaf_nodes()
+    for l in leafs:
+        print(l.value, l.n_args)
