@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as nf
 
-from typing import Callable
+from typing import Callable, Tuple
 
 class SyntaxNode(object):
     # stored op properties in class attribute
@@ -30,6 +30,17 @@ class SyntaxNode(object):
         "var": None,
         "const": torch.rand(1, requires_grad=True)}
 
+    illegal = {
+        '+': [],
+        '-': [],
+        '*': [],
+        '/': [],
+        'sin': ['sin', 'cos', 'exp', 'log'],
+        'cos': ['sin', 'cos', 'exp', 'log'],
+        'exp': ['sin', 'cos', 'exp', 'log'],
+        'var': [],
+        'const': []}
+
     def __init__(self, op: str, parent = None):
         self.left = None
         self.right = None
@@ -40,6 +51,9 @@ class SyntaxNode(object):
         # operation, number of arguments
         self.op = SyntaxNode.op_list[op]
         self.n_args = SyntaxNode.n_args[op]
+
+    def __bool__(self):
+        return True
 
     def add_node(self, node_value : str) -> bool:
         if self.n_args != 0:
@@ -86,6 +100,31 @@ class SyntaxNode(object):
             traversal += self.right.get_preorder()
         return traversal
 
+    def get_last(self):
+        if self.n_args == 2:
+            if self.left != None:
+                res = self.left.get_last()
+                if res:
+                    return res
+            else:
+                return self
+            if self.right != None:
+                res = self.right.get_last()
+                if res:
+                    return res
+                else:
+                    return False
+            else:
+                return self
+        elif self.n_args == 1:
+            if self.left != None:
+                return self.left.get_last()
+            else:
+                return self
+        else:
+            return False
+
+
 def get_expression(root:SyntaxNode) -> str:
     if root.left == None and root.right == None:
         return root.value
@@ -95,7 +134,7 @@ def get_expression(root:SyntaxNode) -> str:
         return '('+ get_expression(root.left) + root.value + get_expression(root.right) + ')'       
 
 def tree_from_preorder(preorder : list) -> SyntaxNode:
-    root = preorder.pop(0)
+    root = SyntaxNode(preorder.pop(0))
     for node_id in preorder:
         root.add_node(node_id)
     return root
@@ -116,6 +155,10 @@ if __name__ == '__main__':
     root2 = SyntaxNode("exp")
     assert root2.from_preorder(['+','*','const','var','const']) == []
     print(get_expression(root2))
-
+    print('last node test')
+    print('const + exp(?)')
+    preorder = ['+','const','exp']
+    tree = tree_from_preorder(preorder)
+    print(tree.get_last().op)
 
     

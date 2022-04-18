@@ -2,10 +2,27 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as nf
 
+from torch.distributions.categorical import Categorical
+from tree import SyntaxNode, tree_from_preorder
+
 N_SAMPLES = 20
 
 
 class SyntaxTreeLSTM(nn.Module):
+    
+    OP_NAMES = ['+',
+                '-',
+                '*',
+                '/',
+                'sin',
+                'cos',
+                'exp',
+                'log',
+                'var',
+                'const',
+                'start',
+                'none']
+
     def __init__(self, n_samples: int):
         super(SyntaxTreeLSTM, self).__init__()
         self.n_samples = n_samples
@@ -19,14 +36,32 @@ class SyntaxTreeLSTM(nn.Module):
         self.lstm2 = nn.LSTMCell(128, 128)
         self.class_head = nn.Linear(128, 9)
         
-    def stop_criterion(self, tree: list) -> bool:
+    def stop_criterion(self, tree: SyntaxNode) -> bool:
         '''Test to see if tree is complete'''
 
-    def update_tree(self, tree: list, node_logits: torch.tensor) -> list:
+    def update_tree(self, tree: SyntaxNode, node_logits: torch.tensor) -> SyntaxTree:
         '''Sample new token from distribution, ignore illegal choices, update tree'''
+        # get last node in tree
+        last_node = tree.get_last()
+        # get list of node names thay may not follow the last node
+        illegal_nodes = last_node.illegal[last_node.value]
+        # convert node names to node indices
+        illegal_nodes = [OP_NAMES.find(name) for name in illegal_nodes]
+        # zero out the logit probabilities for illegal next nodes
+        for index in illegal_nodes:
+            node_logits[index] = 0
+        # get the tree preorder
+        preorder = tree.get_preorder()
+        # sample a new node from the logit distribution and add to preorder
+        dist = Categorical(logits = node_logits)
+        preorder.append(OP_NAMES[dist.sample().item()])
+        # reconstruct tree from the updated preorder
+        tree = tree_from_preorder(preorder)
+        return tree
 
-    def get_parent_sibling(self, tree: list) -> torch.tensor:
+    def get_parent_sibling(self, tree: SyntaxNode) -> torch.tensor:
         '''take tree and return the parent and sibling of next node in traversal'''
+        
 
     def forward(self, x: torch.tensor) -> list:
 
@@ -36,20 +71,19 @@ class SyntaxTreeLSTM(nn.Module):
         out = self.flatten(out)
 
         out = torch.cat((out, torch.zeros_like(out)), dim=1)
-        tree = []
         
         hidden_state_1, cell_state_1 = self.lstm1(out, (hidden_state_1, cell_state_1))
         hidden_state_2, cell_state_2 = self.lstm2(hidden_state_1, (hidden_state_2, cell_state_2))
         node_logits = self.class_head(hidden_state_2)
-        tree = self.update_tree(tree, node_logits)
+        syntax_tree = SyntaxNode(torch.argmax(node_logits))
 
-        while not self.stop_criterion(tree):
-            parent_sibling = self.get_parent_sibling(tree)
+        while not self.stop_criterion(syntax_tree):
+            parent_sibling = self.get_parent_sibling(syntax_tree)
             hidden_state_1, cell_state_1 = self.lstm1(parent_sibling, (hidden_state_1, cell_state_1))
             hidden_state_2, cell_state_2 = self.lstm2(hidden_state_1, (hidden_state_2, cell_state_2))
             node_logits = self.class_head(hidden_state_2)
-            tree = self.update_tree(tree, node_logits)
-        return tree
+            syntax_tree = self.update_tree(syntax_tree, node_logits)
+        return syntax_tree
 
 
 if __name__ == '__main__':
