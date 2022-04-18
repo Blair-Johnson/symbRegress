@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as nf
+from tree import *
 
 N_SAMPLES = 20
-
 
 class SyntaxTreeLSTM(nn.Module):
     def __init__(self, n_samples: int):
@@ -19,8 +19,16 @@ class SyntaxTreeLSTM(nn.Module):
         self.lstm2 = nn.LSTMCell(128, 128)
         self.class_head = nn.Linear(128, 9)
         
-    def stop_criterion(self, tree: list) -> bool:
+    def stop_criterion(self, node_list: list) -> bool:
         '''Test to see if tree is complete'''
+        root = SyntaxNode(node_list.pop(0))
+        node_list = root.from_preorder(node_list) # Build tree
+
+        leaf_list = root.get_leaf_nodes()
+        for leaf in leaf_list:
+            if leaf.n_args != 0:
+                return False
+        return True
 
     def update_tree(self, tree: list, node_logits: torch.tensor) -> list:
         '''Sample new token from distribution, ignore illegal choices, update tree'''
