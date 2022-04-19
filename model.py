@@ -45,7 +45,7 @@ class SyntaxTreeLSTM(nn.Module):
                 return False
         return True
 
-    def update_tree(self, tree: SyntaxNode, node_logits: torch.tensor) -> SyntaxTree:
+    def update_tree(self, tree: SyntaxNode, node_logits: torch.tensor) -> SyntaxNode:
         '''Sample new token from distribution, ignore illegal choices, update tree'''
         # get last node in tree
         last_node = tree.get_last()
