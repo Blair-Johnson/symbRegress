@@ -73,7 +73,7 @@ def main(args):
                 tree.add_node(node, hidden_state_1.detach())
                 # - check if tree complete
                 if complete:
-                    # fit model...
+                    # fit function...
 
                     # calculate reward based on inverse of L2 norm between f(x) and y
                     reward = 1 / (1 + torch.linalg.norm(f(x[0,0]) - x[0,1]))
