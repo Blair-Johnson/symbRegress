@@ -45,11 +45,11 @@ def main(args):
                 if step != 0:
                     node_logits, hidden_state_1, cell_state_1 = policy_model(cell_state_0,
                                                                              node_embed_0,
-                                                                             hidden_state_0)
+                                                                             hidden_state_0 = hidden_state_0)
                 else:
                     node_logits, hidden_state_1, cell_state_1 = policy_model(cell_state_0,
                                                                              node_embed_0,
-                                                                             x)
+                                                                             x = x)
                 # create discrete policy distribution (TODO: Double check this is the correct dim)
                 pi_dist = F.softmax(node_logits, dim=-1)
                 # TODO: Zero elements of the distribution that correspond to illegal nodes
@@ -104,7 +104,48 @@ def main(args):
                 cell_state_0 = cell_state_1
                 node_embed_0 = tree.get_sibling()
                 hidden_state_0 = tree.get_parent_state()
+                
+        # update policy model (not using risk-aware policy at the moment)
+        if (episode > 0):
+            # init a new tree
             
+            # calculate Bellman discounted rewards
+            
+            # normalize rewards
+            
+            optimizer.zero_grad()
+            
+            for i in range(step + 1):
+                # read (s,a,r) from history
+                state = state_history[i]
+                action = action_history[i]
+                reward = reward_history[i]
+                
+                # get sibling type and parent hidden state from tree
+                # these should be deterministic from input data and history of sampled nodes, so
+                # no need to track these in state TODO: fix this / simplify to remove unnecessary state info
+                sibling_type = tree.get_sibling()
+                parent_hidden = tree.get_parent_embed()
+                
+                if i != 0:
+                    node_logits, hidden_state, cell_state = model(cell_state,
+                                                                  sibling_embedding,
+                                                                  hidden_state_0 = parent_hidden)
+                else:
+                    node_logits, hidden_state, cell_state = model(*state)
+                
+                pi_dist = F.softmax(node_logits, dim=-1)
+                pi_dist = Categorical(pi_dist)
+                # gradients propogate through likelihood function back to model and hidden state structure
+                # TODO: Modify to include baseline term
+                loss = -pi_dist.log_prob(action) * reward
+                loss.backward()
+            
+            optimizer.step()
+            
+            state_history = []
+            action_history = []
+            reward_history = []
             
             
             
