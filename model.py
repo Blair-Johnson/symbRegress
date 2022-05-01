@@ -61,6 +61,7 @@ class SyntaxTreeLSTM(nn.Module):
     #             return False
     #     return True
 
+
     # def update_tree(self, tree: SyntaxNode, model_dist: torch.tensor) -> Tuple[SyntaxTree, 
     #                                                                            torch.tensor,
     #                                                                            torch.tensor]:
@@ -86,6 +87,8 @@ class SyntaxTreeLSTM(nn.Module):
     #     # reconstruct tree from the updated preorder
     #     tree = tree_from_preorder(preorder)
     #     return tree, action, log_prob
+
+
 
     # def get_parent_sibling(self, tree: SyntaxNode) -> torch.tensor:
     #     '''take tree and return the parent and sibling of next node in traversal'''
