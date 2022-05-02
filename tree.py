@@ -5,7 +5,7 @@ import torch.nn.functional as nf
 from typing import Callable, Tuple, Union
 
 # TODO: Need the ability to 'append' a new node in preorder without reconstructing the whole tree
-# TODO: Need to track embeddings within tree
+# TODO: Need to add member variable for node embeddings within tree
 # TODO: Need to get tree depth
 
 class SyntaxNode(object):
@@ -172,12 +172,20 @@ class SyntaxNode(object):
 
 def get_expression(root:SyntaxNode) -> str:
     # TODO: Fix this implementation, doesn't work properly with incomplete expressions
-    if root.left == None and root.right == None:
-        return root.value
-    elif root.right == None:
-        return root.value + '(' + get_expression(root.left) + ')'
+    if root.value != 'start':
+        if root.left == None and root.right == None:
+            if (root.value != 'const') and (root.value != 'var'):
+                return root.value
+            elif root.value == 'var':
+                return 'x'
+            else:
+                return str(round(root.op.item(),3))
+        elif root.right == None:
+            return root.value + '(' + get_expression(root.left) + ')'
+        else:
+            return '('+ get_expression(root.left) + root.value + get_expression(root.right) + ')'
     else:
-        return '('+ get_expression(root.left) + root.value + get_expression(root.right) + ')'       
+        return get_expression(root.left)
 
 def tree_from_preorder(preorder : list) -> SyntaxNode:
     root = SyntaxNode(preorder.pop(0))
@@ -241,7 +249,9 @@ if __name__ == '__main__':
     root4.__del__()
     root = SyntaxNode('start')
     root.from_preorder(['exp', '+','*','const','var','const'])
+    print("Initial Expression:")
     print(get_expression(root))
+    print("Target Expression: exp(2.5*x + 6.34)")
     #_ = [param.cuda() for param in SyntaxNode.parameters[root.tree_idx]]
     func_optim = torch.optim.Adam(SyntaxNode.parameters[root.tree_idx], .1)
     def func(x):
@@ -256,5 +266,6 @@ if __name__ == '__main__':
         if step % 100 == 0:
             print(func_loss.item())
         func_optim.step()
-    print(SyntaxNode.parameters)
+    print("Fit Expression:")
+    print(get_expression(root))
     

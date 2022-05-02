@@ -13,8 +13,8 @@ from genDataset import *
 
 N_HIDDEN = 256
 N_SAMPLES = 20
-FUNC_LR = 1e-3
-FUNC_OPTIM_STEPS = 100
+FUNC_LR = .1
+FUNC_OPTIM_STEPS = 1000
 
 parser = argparse.ArgumentParser()
 # number of episodes to run
@@ -113,6 +113,7 @@ def main(args):
                 #   - then evaluate reward function based on L2 norm
 
                 # update state history with policy model inputs
+                # TODO: Don't need all of these, only the first
                 if step !=0:
                     state_history.append([cell_state_0,
                                           node_embed_0,
@@ -134,9 +135,13 @@ def main(args):
                 
         # update policy model (not using risk-aware policy at the moment)
         if (episode > 0):
+            # clear previous tree from memory
+            tree.__del__()
             # init a new tree
+            tree = SyntaxNode('start')
             
             # calculate Bellman discounted rewards
+            
             
             # normalize rewards
             
