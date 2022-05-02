@@ -6,7 +6,7 @@ from typing import Callable, Tuple, Union
 
 # TODO: Need the ability to 'append' a new node in preorder without reconstructing the whole tree
 # TODO: Need to add member variable for node embeddings within tree
-# TODO: Need to get tree depth
+# TODO: Need to get tree depth -> Done
 
 class SyntaxNode(object):
     # stored op properties in class attribute
@@ -168,6 +168,13 @@ class SyntaxNode(object):
                 return self
         else:
             return False
+
+def get_tree_depth(root:SyntaxNode) -> int:    
+    if root == None:
+        return 0
+    left_depth = get_tree_depth(root.left)
+    right_depth = get_tree_depth(root.right)
+    return 1 + max(left_depth, right_depth)
 
 
 def get_expression(root:SyntaxNode) -> str:
