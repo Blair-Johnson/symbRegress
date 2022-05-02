@@ -2,7 +2,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as nf
 
-from typing import Callable, Tuple
+from typing import Callable, Tuple, Union
+
+# TODO: Need the ability to 'append' a new node in preorder without reconstructing the whole tree
+# TODO: Need to track embeddings within tree
+# TODO: Need to get tree depth
 
 class SyntaxNode(object):
     # stored op properties in class attribute
@@ -11,49 +15,80 @@ class SyntaxNode(object):
         "-": 2,
         "*": 2,
         "/": 2,
+        #"^": 2,
         "sin": 1,
         "cos": 1,
         "exp": 1,
         "log": 1,
         "var": 0,
-        "const": 0}
+        "const": 0,
+        "start": 1}
 
     op_list = {
         "+": torch.add,
         "-": torch.subtract,
         "*": torch.multiply,
         "/": torch.divide,
+        #"^": torch.pow,
         "sin": torch.sin,
         "cos": torch.cos,
         "exp": torch.exp,
         "log": torch.log,
         "var": None,
-        "const": torch.rand(1, requires_grad=True)}
+        "const": torch.rand,
+        "start": lambda x: x}
 
     illegal = {
         '+': [],
         '-': [],
         '*': [],
         '/': [],
+        #'^': ['exp', 'log'],
         'sin': ['sin', 'cos', 'exp', 'log'],
         'cos': ['sin', 'cos', 'exp', 'log'],
         'exp': ['sin', 'cos', 'exp', 'log'],
         'var': [],
-        'const': []}
+        'const': [],
+        'start': []}
 
+    # TODO: Probably a better way to track parameters, potentially a memory leak
+    parameters = {}
+    
+    instance_counter = 0
+    
     def __init__(self, op: str, parent = None):
         self.left = None
         self.right = None
+        self.tree_idx = None
         self.parent = parent
         assert op in SyntaxNode.op_list.keys()
         self.value = op
+        self.illegal = SyntaxNode.illegal[self.value]
             
         # operation, number of arguments
         self.op = SyntaxNode.op_list[op]
         self.n_args = SyntaxNode.n_args[op]
+        
+        # update parameters
+        if self.value == 'start':
+            SyntaxNode.instance_counter += 1
+            self.tree_idx = SyntaxNode.instance_counter
+            SyntaxNode.parameters[self.tree_idx] = []
+        elif self.value == 'const':
+            self.tree_idx = self.parent.tree_idx
+            self.op = self.op(1, requires_grad=True)
+            SyntaxNode.parameters[self.tree_idx].append(self.op)
+        else:
+            self.tree_idx = self.parent.tree_idx
 
     def __bool__(self):
         return True
+    
+    def __del__(self):
+        if self.value == 'start':
+            if self.tree_idx in SyntaxNode.parameters.keys():
+                #print(f'deleting {self.tree_idx} from param keys: {SyntaxNode.parameters.keys()}')
+                del SyntaxNode.parameters[self.tree_idx]
 
     def add_node(self, node_value : str) -> bool:
         if self.n_args != 0:
@@ -70,12 +105,12 @@ class SyntaxNode(object):
 
     def from_preorder(self, node_list: list) -> list:
         if self.n_args == 2:
-            self.left = SyntaxNode(node_list.pop(0))
+            self.left = SyntaxNode(node_list.pop(0), self)
             node_list = self.left.from_preorder(node_list)
-            self.right = SyntaxNode(node_list.pop(0))
+            self.right = SyntaxNode(node_list.pop(0), self)
             return self.right.from_preorder(node_list)
         elif self.n_args == 1:
-            self.left = SyntaxNode(node_list.pop(0))
+            self.left = SyntaxNode(node_list.pop(0), self)
             return self.left.from_preorder(node_list)
         else:
             return node_list
@@ -87,7 +122,7 @@ class SyntaxNode(object):
             return self.op(self.left.get_function(X),
                            self.right.get_function(X))
         else:
-            if self.op != None:
+            if (self.op != None):
                 return self.op
             else:
                 return X
@@ -136,6 +171,7 @@ class SyntaxNode(object):
 
 
 def get_expression(root:SyntaxNode) -> str:
+    # TODO: Fix this implementation, doesn't work properly with incomplete expressions
     if root.left == None and root.right == None:
         return root.value
     elif root.right == None:
@@ -149,33 +185,41 @@ def tree_from_preorder(preorder : list) -> SyntaxNode:
         root.add_node(node_id)
     return root
 
+def tree_complete(root: SyntaxNode) -> bool:
+    ''' Test to see if tree is complete'''
+    leaf_list = tree.get_leaf_nodes()
+    for leaf in leaf_list:
+        if leaf.n_args != 0:
+            return False
+    return True
+
 if __name__ == '__main__':
     # lambda x: exp(ax + b)
-    root = SyntaxNode("exp") # exp
-    root.add_node("+") # exp( + )
-    root.left.add_node("*") # exp(( * ) + )
-    root.left.add_node("const") # exp(( * ) + b)
-    root.left.left.add_node("const") # exp((a * ) + b)
-    root.left.left.add_node("var") # exp((a * x) + b)
-    x = torch.tensor(3.5)
-    print(root.get_function(x))
-    print(root.get_preorder())
-    print(get_expression(root))
+    # root = SyntaxNode("exp") # exp
+    # root.add_node("+") # exp( + )
+    # root.left.add_node("*") # exp(( * ) + )
+    # root.left.add_node("const") # exp(( * ) + b)
+    # root.left.left.add_node("const") # exp((a * ) + b)
+    # root.left.left.add_node("var") # exp((a * x) + b)
+    # x = torch.tensor(3.5)
+    # print(root.get_function(x))
+    # print(root.get_preorder())
+    # print(get_expression(root))
 
     print('reconstruction test:')
-    root2 = SyntaxNode("exp")
-    assert root2.from_preorder(['+','*','const','var','const']) == []
+    root2 = SyntaxNode("start")
+    assert root2.from_preorder(['exp','+','*','const','var','const']) == []
     print(get_expression(root2))
 
     print('Last node test:')
     print('const + exp(?)')
-    preorder = ['+','const','exp']
+    preorder = ['start','+','const','exp']
     tree = tree_from_preorder(preorder)
     print(tree.get_last().op)
 
     print("Non-empty list test:")
-    root3 = SyntaxNode("exp")
-    l = root3.from_preorder(['+','*','const','var','const', "*", "+"])
+    root3 = SyntaxNode("start")
+    l = root3.from_preorder(['exp','+','*','const','var','const'])
     print("l:", l)
     print("root3:", get_expression(root3))
     
@@ -183,3 +227,34 @@ if __name__ == '__main__':
     leafs = root3.get_leaf_nodes()
     for l in leafs:
         print(l.value, l.n_args)
+        
+    print("Parameter Tracking Test:")
+    root2.__del__()
+    root3.__del__()
+    tree.__del__()
+    root4 = SyntaxNode("start")
+    root4.from_preorder(['+','*','const','var','const'])
+    print(SyntaxNode.parameters)
+    print(SyntaxNode.parameters.keys())
+    
+    print("Fit test")
+    root4.__del__()
+    root = SyntaxNode('start')
+    root.from_preorder(['exp', '+','*','const','var','const'])
+    print(get_expression(root))
+    #_ = [param.cuda() for param in SyntaxNode.parameters[root.tree_idx]]
+    func_optim = torch.optim.Adam(SyntaxNode.parameters[root.tree_idx], .1)
+    def func(x):
+        return torch.exp(2.5*x + 6.34)
+    X = torch.rand((1,20)) #.cuda()
+    y = func(X)
+    for step in range(1000):
+        func_optim.zero_grad()
+        y_hat = root.get_function(X)
+        func_loss = torch.mean((y_hat - y)**2)
+        func_loss.backward()
+        if step % 100 == 0:
+            print(func_loss.item())
+        func_optim.step()
+    print(SyntaxNode.parameters)
+    

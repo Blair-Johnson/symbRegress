@@ -10,18 +10,7 @@ N_SAMPLES = 20
 
 class SyntaxTreeLSTM(nn.Module):
     ''' Define the set of possible operations'''
-    OP_NAMES = ['+',
-                '-',
-                '*',
-                '/',
-                'sin',
-                'cos',
-                'exp',
-                'log',
-                'var',
-                'const',
-                'start',
-                'none']
+    OP_NAMES = SyntaxNode.op_list.keys()
 
     def __init__(self, n_samples:int, n_hidden: int):
         super(SyntaxTreeLSTM, self).__init__()
@@ -135,7 +124,7 @@ class SyntaxTreeLSTM(nn.Module):
 
 if __name__ == '__main__':
     x = torch.ones(1,2,20)
-    node = torch.ones(1,12)
+    node = torch.ones(1,11)
     cs = torch.zeros(1,256)
     model = SyntaxTreeLSTM(20, 256)
     print(model(cs, node, x=x))
