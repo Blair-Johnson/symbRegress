@@ -10,7 +10,12 @@ from torch.distributions.categorical import Categorical
 from torch.utils.tensorboard import SummaryWriter
 from tree import *
 from model import *
-from genDataset import *
+from genDatasets import *
+
+if torch.cuda.is_available():
+    DEVICE = 'cuda'
+else:
+    DEVICE = 'cpu'
 
 N_HIDDEN = 256
 N_SAMPLES = 20
@@ -31,13 +36,14 @@ parser.add_argument('--logdir', type=str, default='./logs')
 
 def main(args):
     
-    policy_model = SyntaxTreeLSTM(N_SAMPLES, N_HIDDEN)
+    policy_model = SyntaxTreeLSTM(N_SAMPLES, N_HIDDEN).to(DEVICE)
     optimizer = torch.optim.Adam(policy_model.parameters(), lr=POLICY_LR)
-    logger = SummaryWriter(args.logdir, )
+    logger = SummaryWriter(args.logdir)
+    print('Init model...')
     
     for episode in range(args.num_episodes):
         # execute many episodes of exploration and policy updates
-        
+        print(f'Episode: {episode}')
         state_history = []
         action_history = []
         reward_history = []
@@ -60,16 +66,16 @@ def main(args):
         with torch.no_grad():
             for step in count():
                 # loop until tree is complete or passes max depth
-
+                
                 # step LSTM and get new node logits
                 if step != 0:
                     node_logits, hidden_state_1, cell_state_1 = policy_model(cell_state_0,
                                                                              node_embed_0,
                                                                              hidden_state_0 = hidden_state_0)
                 else:
-                    node_logits, hidden_state_1, cell_state_1 = policy_model(cell_state_0,
-                                                                             node_embed_0,
-                                                                             x = x_train)
+                    node_logits, hidden_state_1, cell_state_1 = policy_model(cell_state_0.to(DEVICE),
+                                                                             node_embed_0.to(DEVICE),
+                                                                             x = x_train.to(DEVICE))
                 # create discrete policy distribution (TODO: Double check this is the correct dim)
                 pi_dist = F.softmax(node_logits, dim=-1)
                 
@@ -103,18 +109,23 @@ def main(args):
                 
                 # - check if tree complete
                 if tree_complete(tree):
+                    print('Tree complete!')
+                    
                     # fit function...
+                    SyntaxNode.parameters[tree.tree_idx] = [param.to(DEVICE) for param in SyntaxNode.parameters[tree.tree_idx]]
                     func_optim = torch.optim.Adam(SyntaxNode.parameters[tree.tree_idx], lr = FUNC_LR)
                     for step in range(FUNC_OPTIM_STEPS):
                         func_optim.zero_grad()
-                        func_loss = torch.mean((tree.get_function(x_train[0,0]) - x_train[0,1])**2)
+                        func_loss = torch.mean((tree.get_function(x_train[0,0].to(DEVICE)) - x_train[0,1].to(DEVICE))**2)
                         func_loss.backward()
                         func_optim.step()
-
+                        if (step % 100) == 0:
+                            print(f'Fitting func: {func_loss.item()}')
                     # calculate reward based on inverse of L2 norm between f(x) and y
                     reward = 1 / (1 + torch.mean((f(x_test[0,0]) - x_test[0,1])**2))
    
                 elif get_tree_depth >= args.max_depth:
+                    print('Max depth exceeded.')
                     reward = 0
                     exceeds_max_depth = True
                     break
@@ -151,7 +162,8 @@ def main(args):
             # skip to next episode if max depth exceeded
             continue
         # update policy model (not using risk-aware policy at the moment)
-        if (episode > 0):                        
+        if (episode > 0):
+            print('Training phase...')
             # calculate Bellman discounted rewards
             bellman_rewards = []
             reward_sum = 0
@@ -202,7 +214,9 @@ def main(args):
                                                                   hidden_state_0 = parent_hidden)
                 else:
                     # initial function data and state vectors
-                    node_logits, hidden_state, cell_state = policy_model(*state)
+                    node_logits, hidden_state, cell_state = policy_model(state[0].to(DEVICE),
+                                                                         state[1].to(DEVICE),
+                                                                         state[2].to(DEVICE))
                     
                 tree.append(SyntaxNode.op_list.keys()[action], hidden_state)
                 
