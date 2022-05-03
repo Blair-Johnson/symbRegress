@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as nf
+import torch.nn.functional as F
 
 from typing import Callable, Tuple, Union, List
 
@@ -90,6 +90,9 @@ class SyntaxNode(object):
             if self.tree_idx in SyntaxNode.parameters.keys():
                 #print(f'deleting {self.tree_idx} from param keys: {SyntaxNode.parameters.keys()}')
                 del SyntaxNode.parameters[self.tree_idx]
+                
+    def get_embedding(self, type_idx: int) -> torch.tensor:
+        return F.one_hot(torch.tensor(type_idx), len(SyntaxNode.op_list.keys())).view(1, -1)
 
     def add_node(self, node:'SyntaxNode') -> bool:
         if self.n_args != 0:
@@ -170,10 +173,24 @@ class SyntaxNode(object):
         else:
             return False
         
+    def get_parent_state(self) -> torch.tensor:
+        parent = self.get_last()
+        return parent.data
+    
+    def get_sibling_token(self) -> torch.tensor:
+        parent = self.get_last()
+        if parent.n_args == 2:
+            if parent.left == None:
+                return self.get_embedding(list(SyntaxNode.op_list.keys()).find('none'))
+            else:
+                return self.get_embedding(list(SyntaxNode.op_list.keys()).find(parent.left.value))
+        else:
+            return self.get_embedding(list(SyntaxNode.op_list.keys()).find('none'))
+        
     def append(self, node_type:str, data:torch.tensor = None) -> bool:
         last_parent = self.get_last()
         return last_parent.add_node(SyntaxNode(node_type, parent=self, data=data))
-
+    
 def get_tree_depth(root:SyntaxNode) -> int:    
     if root == None:
         return 0

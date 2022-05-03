@@ -15,7 +15,9 @@ from genDataset import *
 N_HIDDEN = 256
 N_SAMPLES = 20
 FUNC_LR = .1
+POLICY_LR = 1e-3
 FUNC_OPTIM_STEPS = 1000
+BELLMAN_GAMMA = .95
 
 parser = argparse.ArgumentParser()
 # number of episodes to run
@@ -23,9 +25,15 @@ parser.add_argument('--num_episodes', type=int, default=1000)
 # maximum search depth
 parser.add_argument('--max_depth', type=int, default=12)
 # risk threshold for policy gradient calculation
-# parser.add_argument('--r_epsilon', type=float, default=9.0) 
+# parser.add_argument('--r_epsilon', type=float, default=9.0)
+# log directory
+parser.add_argument('--logdir', type=str, default='./logs')
 
 def main(args):
+    
+    policy_model = SyntaxTreeLSTM(N_SAMPLES, N_HIDDEN)
+    optimizer = torch.optim.Adam(policy_model.parameters(), lr=POLICY_LR)
+    logger = SummaryWriter(args.logdir, )
     
     for episode in range(args.num_episodes):
         # execute many episodes of exploration and policy updates
@@ -43,7 +51,7 @@ def main(args):
         # 2. initialize empty cell state
         cell_state = torch.zeros((1, N_HIDDEN))
         # 3. create start node embedding
-        node_embed_0 = F.one_hot(torch.tensor(SyntaxNode.op_list.keys().find('start')), len(SyntaxNode.op_list.keys()))
+        node_embed_0 = F.one_hot(torch.tensor(list(SyntaxNode.op_list.keys()).find('start')), len(SyntaxNode.op_list.keys()))
         node_embed_0 = node_embed_0.view(1, -1)
         # 4. initialize the syntax tree (environment)
         tree = SyntaxNode('start')
@@ -136,55 +144,109 @@ def main(args):
                 # step states for next iteration
                 # TODO: break these off from computation graph
                 cell_state_0 = cell_state_1
-                node_embed_0 = tree.get_sibling()
+                node_embed_0 = tree.get_sibling_type()
                 hidden_state_0 = tree.get_parent_state()
                 
         if exceeds_max_depth:
             # skip to next episode if max depth exceeded
             continue
         # update policy model (not using risk-aware policy at the moment)
-        if (episode > 0):
-            # clear previous tree from memory
-            tree.__del__()
-            # init a new tree
-            tree = SyntaxNode('start')
-            
+        if (episode > 0):                        
             # calculate Bellman discounted rewards
-            
+            bellman_rewards = []
+            reward_sum = 0
+            for reward in reversed(reward_history):
+                reward_sum += BELLMAN_GAMMA * reward
+                bellman_rewards.append(reward_sum)
+            bellman_rewards.reverse()
+            bellman_rewards = np.array(bellman_rewards)
             
             # normalize rewards
+            mu = np.mean(bellman_rewards)
+            sigma = np.std(bellman_rewards)
+            bellman_rewards = (bellman_rewards - mu) / sigma
             
+            # log episode mean reward
+            writer.add_scalar('reward/train', float(mean), episode)
+            
+            # replace reward history with normalized bellman rewards
+            reward_history = list(bellman_rewards)
+            
+            # zero model optimizer gradient for training
             optimizer.zero_grad()
             
-            for i in range(step + 1):
-                # read (s,a,r) from history
-                state = state_history[i]
-                action = action_history[i]
-                reward = reward_history[i]
+            tree.__del__()
+            tree.SyntaxNode('start')
+            for history_step in range(step + 1):
+                #tree.__del__()
+                # init a new tree, will step through cumulative tree iterations
+                # this is necessary because each optimizer step will change the policy model,
+                # thus tree must be reconstructed with the new policy model each time
+                #tree = SyntaxNode('start')
+                
+                # read (s,a,r) from history for the end state of this partial trajectory
+                state = state_history[history_step]
+                action = action_history[history_step]
+                reward = reward_history[history_step]
                 
                 # get sibling type and parent hidden state from tree
                 # these should be deterministic from input data and history of sampled nodes, so
                 # no need to track these in state TODO: fix this / simplify to remove unnecessary state info
-                sibling_type = tree.get_sibling()
-                parent_hidden = tree.get_parent_embed()
                 
-                if i != 0:
-                    node_logits, hidden_state, cell_state = model(cell_state,
-                                                                  sibling_embedding,
+                sibling_token = tree.get_sibling_token()
+                parent_hidden = tree.get_parent_state()
+                
+                if train_step != 0:
+                    node_logits, hidden_state, cell_state = policy_model(cell_state,
+                                                                  sibling_token,
                                                                   hidden_state_0 = parent_hidden)
                 else:
-                    node_logits, hidden_state, cell_state = model(*state)
+                    # initial function data and state vectors
+                    node_logits, hidden_state, cell_state = policy_model(*state)
+                    
+                tree.append(SyntaxNode.op_list.keys()[action], hidden_state)
                 
                 pi_dist = F.softmax(node_logits, dim=-1)
                 pi_dist = Categorical(pi_dist)
-                # gradients propogate through likelihood function back to model and hidden state structure
-                # TODO: Modify to include baseline term
                 loss = -pi_dist.log_prob(action) * reward
                 loss.backward()
-            
+                
+            # step optimizer on accumulated gradient
             optimizer.step()
-            
-            
+                
+                # # zero model optimizer gradient for training
+                # optimizer.zero_grad()
+                
+                # build tree through inference to current state
+#                 for train_step in range(history_step + 1):
+#                     # ex: hist -> [exp, +, var, const]
+#                     # hist step 0 -> training steps: [exp]
+#                     # hist step 1 -> training steps: [exp, +]
+#                     # hist step 2 -> training steps: [exp, +, var]
+                    
+#                     sibling_token = tree.get_sibling_token()
+#                     parent_hidden = tree.get_parent_state()
+
+#                     if train_step != 0:
+#                         node_logits, hidden_state, cell_state = model(cell_state,
+#                                                                       sibling_token,
+#                                                                       hidden_state_0 = parent_hidden)
+#                     else:
+#                         # initial function data and state vectors
+#                         node_logits, hidden_state, cell_state = model(*state_history[0])
+                        
+#                     # retaining hidden state within torch graph, allows lstm to backprop through time
+#                     tree.append(SyntaxNode.op_list.keys()[action_history[train_step]], hidden_state)
+                
+#                 pi_dist = F.softmax(node_logits, dim=-1)
+#                 pi_dist = Categorical(pi_dist)
+#                 # gradients propogate through likelihood function back to model and hidden state structure
+#                 # TODO: Modify to include baseline term
+#                 loss = -pi_dist.log_prob(action) * reward
+#                 loss.backward()
+#                 # possibly de-indent optim.step() if we want gradients to accumulate and then step after whole trajectory
+#                 # this would eliminate the need for the inner training loop
+#                 optimizer.step()
             
 if __name__ == '__main__':
     args = parser.parse_args()
