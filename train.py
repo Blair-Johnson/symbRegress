@@ -7,6 +7,7 @@ import random
 
 from itertools import count
 from torch.distributions.categorical import Categorical
+from torch.utils.tensorboard import SummaryWriter
 from tree import *
 from model import *
 from genDataset import *
@@ -26,12 +27,13 @@ parser.add_argument('--max_depth', type=int, default=12)
 
 def main(args):
     
-    state_history = []
-    action_history = []
-    reward_history = []
-    
     for episode in range(args.num_episodes):
         # execute many episodes of exploration and policy updates
+        
+        state_history = []
+        action_history = []
+        reward_history = []
+        exceeds_max_depth = False
         
         # 1. get initial batch of data from dataloader
         func_index = random.randint(1,9)
@@ -103,7 +105,11 @@ def main(args):
 
                     # calculate reward based on inverse of L2 norm between f(x) and y
                     reward = 1 / (1 + torch.mean((f(x_test[0,0]) - x_test[0,1])**2))
-                    
+   
+                elif get_tree_depth >= args.max_depth:
+                    reward = 0
+                    exceeds_max_depth = True
+                    break
                 else:
                     reward = 0
                 # TODO:
@@ -133,6 +139,9 @@ def main(args):
                 node_embed_0 = tree.get_sibling()
                 hidden_state_0 = tree.get_parent_state()
                 
+        if exceeds_max_depth:
+            # skip to next episode if max depth exceeded
+            continue
         # update policy model (not using risk-aware policy at the moment)
         if (episode > 0):
             # clear previous tree from memory
@@ -174,10 +183,6 @@ def main(args):
                 loss.backward()
             
             optimizer.step()
-            
-            state_history = []
-            action_history = []
-            reward_history = []
             
             
             

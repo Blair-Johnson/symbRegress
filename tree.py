@@ -56,11 +56,12 @@ class SyntaxNode(object):
     
     instance_counter = 0
     
-    def __init__(self, op: str, parent = None):
+    def __init__(self, op: str, parent = None, data = None):
         self.left = None
         self.right = None
         self.tree_idx = None
         self.parent = parent
+        self.data = data
         assert op in SyntaxNode.op_list.keys()
         self.value = op
         self.illegal = SyntaxNode.illegal[self.value]
