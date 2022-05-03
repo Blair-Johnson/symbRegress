@@ -118,17 +118,17 @@ def gen_datasets(name, train_seed, test_seed):
     else:
         print("ERROR: Name not in known set of cases.")
 
+if __name__ == '__main__':
+        
+    # Example for Nguyen expression with a single input variable, x
+    x_train, x_test, z_train, z_test = gen_datasets("Nguyen-1", 2022, 6254)
+    print("Training data (x_train and z_train) for Nguyen-1")
+    print(x_train)
+    print(z_train)
 
-
-# Example for Nguyen expression with a single input variable, x
-x_train, x_test, z_train, z_test = gen_datasets("Nguyen-1", 2022, 6254)
-print("Training data (x_train and z_train) for Nguyen-1")
-print(x_train)
-print(z_train)
-
-# Example for Nguyen expression with two input variables, x and y
-x_train, x_test, y_train, y_test, z_train, z_test = gen_datasets("Nguyen-9", 2022, 6254)
-print("\nTraining data (x_train, y_train, and z_train) for Nguyen-9")
-print(x_train)
-print(y_train)
-print(z_train)
+    # Example for Nguyen expression with two input variables, x and y
+    x_train, x_test, y_train, y_test, z_train, z_test = gen_datasets("Nguyen-9", 2022, 6254)
+    print("\nTraining data (x_train, y_train, and z_train) for Nguyen-9")
+    print(x_train)
+    print(y_train)
+    print(z_train)
