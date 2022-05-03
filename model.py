@@ -29,8 +29,8 @@ class SyntaxTreeLSTM(nn.Module):
         self.embed = nn.Linear(self.__test_forward(), self.n_hidden)
         # lstm cell for model execution
         self.lstm = nn.LSTMCell(len(SyntaxTreeLSTM.OP_NAMES), self.n_hidden)
-        # classification head to project hidden states to policy distributions
-        self.class_head = nn.Linear(self.n_hidden, len(SyntaxTreeLSTM.OP_NAMES))
+        # classification head to project hidden states to policy distributions (-2 to ignore start and none nodes)
+        self.class_head = nn.Linear(self.n_hidden, len(SyntaxTreeLSTM.OP_NAMES) - 2)
     
     def __test_forward(self) -> int:
         ''' Get the output dimension of the convolutional feature extractor'''

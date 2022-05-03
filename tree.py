@@ -22,7 +22,8 @@ class SyntaxNode(object):
         "log": 1,
         "var": 0,
         "const": 0,
-        "start": 1}
+        "start": 1,
+        "none": 0}
 
     op_list = {
         "+": torch.add,
@@ -36,7 +37,8 @@ class SyntaxNode(object):
         "log": torch.log,
         "var": None,
         "const": torch.rand,
-        "start": lambda x: x}
+        "start": lambda x: x,
+        "none": None}
 
     illegal = {
         '+': [],
@@ -47,9 +49,11 @@ class SyntaxNode(object):
         'sin': ['sin', 'cos', 'exp', 'log'],
         'cos': ['sin', 'cos', 'exp', 'log'],
         'exp': ['sin', 'cos', 'exp', 'log'],
+        'log': ['sin', 'cos', 'exp', 'log'],
         'var': [],
         'const': [],
-        'start': []}
+        'start': ['var','const'],
+        'none': []}
 
     # TODO: Probably a better way to track parameters, potentially a memory leak
     parameters = {}
@@ -77,7 +81,7 @@ class SyntaxNode(object):
             SyntaxNode.parameters[self.tree_idx] = []
         elif self.value == 'const':
             self.tree_idx = self.parent.tree_idx
-            self.op = self.op(1, requires_grad=True)
+            self.op = self.op(1, requires_grad =True)
             SyntaxNode.parameters[self.tree_idx].append(self.op)
         else:
             self.tree_idx = self.parent.tree_idx
@@ -92,7 +96,7 @@ class SyntaxNode(object):
                 del SyntaxNode.parameters[self.tree_idx]
                 
     def get_embedding(self, type_idx: int) -> torch.tensor:
-        return F.one_hot(torch.tensor(type_idx), len(SyntaxNode.op_list.keys())).view(1, -1)
+        return F.one_hot(torch.tensor(type_idx), len(SyntaxNode.op_list.keys())).view(1, -1).float()
 
     def add_node(self, node:'SyntaxNode') -> bool:
         if self.n_args != 0:
@@ -181,11 +185,11 @@ class SyntaxNode(object):
         parent = self.get_last()
         if parent.n_args == 2:
             if parent.left == None:
-                return self.get_embedding(list(SyntaxNode.op_list.keys()).find('none'))
+                return self.get_embedding(list(SyntaxNode.op_list.keys()).index('none'))
             else:
-                return self.get_embedding(list(SyntaxNode.op_list.keys()).find(parent.left.value))
+                return self.get_embedding(list(SyntaxNode.op_list.keys()).index(parent.left.value))
         else:
-            return self.get_embedding(list(SyntaxNode.op_list.keys()).find('none'))
+            return self.get_embedding(list(SyntaxNode.op_list.keys()).index('none'))
         
     def append(self, node_type:str, data:torch.tensor = None) -> bool:
         last_parent = self.get_last()
@@ -222,11 +226,20 @@ def get_expression(root:SyntaxNode) -> str:
 
 def tree_complete(root: SyntaxNode) -> bool:
     ''' Test to see if tree is complete'''
-    leaf_list = tree.get_leaf_nodes()
-    for leaf in leaf_list:
-        if leaf.n_args != 0:
+    if root.n_args == 2:
+        if root.left == None:
             return False
-    return True
+        elif root.right == None:
+            return False
+        else:
+            return tree_complete(root.left) and tree_complete(root.right)
+    elif root.n_args == 1:
+        if root.left == None:
+            return False
+        else:
+            return tree_complete(root.left)
+    else:
+        return True
 
 if __name__ == '__main__':
     # lambda x: exp(ax + b)
@@ -307,3 +320,15 @@ if __name__ == '__main__':
     root.append('var')
     root.append('const')
     print(get_expression(root))
+    
+    print("Complete tree test")
+    root.__del__()
+    root = SyntaxNode('start')
+    root.append('-')
+    root.append('log')
+    root.append('const')
+    leafs = root.get_leaf_nodes()
+    for l in leafs:
+        print(l.value, l.n_args)
+    print(get_expression(root))
+    print(tree_complete(root))
