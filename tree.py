@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as nf
 
-from typing import Callable, Tuple, Union
+from typing import Callable, Tuple, Union, List
 
 # TODO: Need the ability to 'append' a new node in preorder without reconstructing the whole tree
 # TODO: Need to add member variable for node embeddings within tree
@@ -56,7 +56,7 @@ class SyntaxNode(object):
     
     instance_counter = 0
     
-    def __init__(self, op: str, parent = None, data = None):
+    def __init__(self, op: str, parent:'SyntaxNode' = None, data:torch.tensor = None):
         self.left = None
         self.right = None
         self.tree_idx = None
@@ -91,13 +91,13 @@ class SyntaxNode(object):
                 #print(f'deleting {self.tree_idx} from param keys: {SyntaxNode.parameters.keys()}')
                 del SyntaxNode.parameters[self.tree_idx]
 
-    def add_node(self, node_value : str) -> bool:
+    def add_node(self, node:'SyntaxNode') -> bool:
         if self.n_args != 0:
             if self.left == None:
-                self.left = SyntaxNode(node_value, self)
+                self.left = node
                 return True
             elif (self.n_args != 1) and (self.right == None):
-                self.right = SyntaxNode(node_value, self)
+                self.right = node
                 return True
             else:
                 return False
@@ -169,6 +169,10 @@ class SyntaxNode(object):
                 return self
         else:
             return False
+        
+    def append(self, node_type:str, data:torch.tensor = None) -> bool:
+        last_parent = self.get_last()
+        return last_parent.add_node(SyntaxNode(node_type, parent=self, data=data))
 
 def get_tree_depth(root:SyntaxNode) -> int:    
     if root == None:
@@ -177,6 +181,10 @@ def get_tree_depth(root:SyntaxNode) -> int:
     right_depth = get_tree_depth(root.right)
     return 1 + max(left_depth, right_depth)
 
+def tree_from_preorder(preorder:list) -> SyntaxNode:
+    root = SyntaxNode(preorder.pop(0))
+    root.from_preorder(preorder)
+    return root
 
 def get_expression(root:SyntaxNode) -> str:
     # TODO: Fix this implementation, doesn't work properly with incomplete expressions
@@ -194,12 +202,6 @@ def get_expression(root:SyntaxNode) -> str:
             return '('+ get_expression(root.left) + root.value + get_expression(root.right) + ')'
     else:
         return get_expression(root.left)
-
-def tree_from_preorder(preorder : list) -> SyntaxNode:
-    root = SyntaxNode(preorder.pop(0))
-    for node_id in preorder:
-        root.add_node(node_id)
-    return root
 
 def tree_complete(root: SyntaxNode) -> bool:
     ''' Test to see if tree is complete'''
@@ -230,7 +232,8 @@ if __name__ == '__main__':
     print('Last node test:')
     print('const + exp(?)')
     preorder = ['start','+','const','exp']
-    tree = tree_from_preorder(preorder)
+    tree = SyntaxNode(preorder.pop(0))
+    _ = [tree.append(node) for node in preorder]
     print(tree.get_last().op)
 
     print("Non-empty list test:")
@@ -277,3 +280,13 @@ if __name__ == '__main__':
     print("Fit Expression:")
     print(get_expression(root))
     
+    print("Append Test:")
+    root.__del__()
+    root = SyntaxNode('start')
+    root.append('exp')
+    root.append('+')
+    root.append('*')
+    root.append('const')
+    root.append('var')
+    root.append('const')
+    print(get_expression(root))
