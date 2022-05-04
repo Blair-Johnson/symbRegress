@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from typing import Callable, Tuple, Union, List
 
 # TODO: Need better system for determining what nodes are illegal to add
+# example usage get_illegal_set(tree:SyntaxNode) -> set{'var','const',...}
 
 class SyntaxNode(object):
     # stored op properties in class attribute
@@ -39,19 +40,19 @@ class SyntaxNode(object):
         "none": None}
 
     illegal = {
-        '+': [],
-        '-': [],
-        '*': [],
-        '/': [],
+        '+': set(),
+        '-': set(),
+        '*': set(),
+        '/': {'/'},
         #'^': ['exp', 'log'],
-        'sin': ['sin', 'cos', 'exp', 'log', 'const'],
-        'cos': ['sin', 'cos', 'exp', 'log', 'const'],
-        'exp': ['sin', 'cos', 'exp', 'log', 'const'],
-        'log': ['sin', 'cos', 'exp', 'log', 'const'],
-        'var': [],
-        'const': [],
-        'start': ['var','const'],
-        'none': []}
+        'sin': {'sin', 'cos', 'exp', 'log'},
+        'cos': {'sin', 'cos', 'exp', 'log'},
+        'exp': {'sin', 'cos', 'exp', 'log'},
+        'log': {'sin', 'cos', 'exp', 'log'},
+        'var': set(),
+        'const': set(),
+        'start': {'var','const'},
+        'none': set()}
 
     # TODO: Probably a better way to track parameters, potentially a memory leak
     parameters = {}
@@ -188,17 +189,30 @@ class SyntaxNode(object):
                 return self.get_embedding(list(SyntaxNode.op_list.keys()).index(parent.left.value))
         else:
             return self.get_embedding(list(SyntaxNode.op_list.keys()).index('none'))
-        
+    
+    def get_sibling(self):
+        parent = self.get_last()
+        if parent.n_args == 2:
+            if parent.left == None:
+                return None
+            else:
+                return parent.left
+        else:
+            return None
+
     def append(self, node_type:str, data:torch.tensor = None) -> bool:
         last_parent = self.get_last()
-        return last_parent.add_node(SyntaxNode(node_type, parent=self, data=data))
+        return last_parent.add_node(SyntaxNode(node_type, parent=last_parent, data=data))
     
-def get_tree_depth(root:SyntaxNode) -> int:    
+def __get_tree_depth(root:SyntaxNode) -> int:    
     if root == None:
         return 0
-    left_depth = get_tree_depth(root.left)
-    right_depth = get_tree_depth(root.right)
+    left_depth = __get_tree_depth(root.left)
+    right_depth = __get_tree_depth(root.right)
     return 1 + max(left_depth, right_depth)
+
+def get_tree_depth(root:SyntaxNode) -> int:
+    return __get_tree_depth(root) - 2
 
 def tree_from_preorder(preorder:list) -> SyntaxNode:
     root = SyntaxNode(preorder.pop(0))
@@ -222,6 +236,22 @@ def get_expression(root:SyntaxNode) -> str:
     else:
         return get_expression(root.left)
 
+def get_expression_refactor(root:SyntaxNode) -> str:
+    if root != None:
+        if root.n_args == 2:
+            return '( {} {} {} )'.format(get_expression_refactor(root.left), root.value, get_expression_refactor(root.right))
+        elif root.n_args == 1:
+            return root.value + f'( {get_expression_refactor(root.left)} )'
+        else:
+            if root.value == 'var':
+                return 'x'
+            elif root.value == 'const':
+                return str(round(root.op.item(),3))
+            else:
+                return '?'
+    else:
+        return '?'
+
 def tree_complete(root: SyntaxNode) -> bool:
     ''' Test to see if tree is complete'''
     if root.n_args == 2:
@@ -239,19 +269,39 @@ def tree_complete(root: SyntaxNode) -> bool:
     else:
         return True
 
-if __name__ == '__main__':
-    # lambda x: exp(ax + b)
-    # root = SyntaxNode("exp") # exp
-    # root.add_node("+") # exp( + )
-    # root.left.add_node("*") # exp(( * ) + )
-    # root.left.add_node("const") # exp(( * ) + b)
-    # root.left.left.add_node("const") # exp((a * ) + b)
-    # root.left.left.add_node("var") # exp((a * x) + b)
-    # x = torch.tensor(3.5)
-    # print(root.get_function(x))
-    # print(root.get_preorder())
-    # print(get_expression(root))
+def get_node_depth(node: SyntaxNode, counter = 0) -> int:
+    if node.value != 'start':
+        return get_node_depth(node.parent, counter+1)
+    else:
+        return counter
 
+def child_of(node: SyntaxNode, nodetypes: set) -> bool:
+    if node.value == 'start':
+        return False
+    elif node.value in nodetypes:
+        return True
+    else:
+        return child_of(node.parent, nodetypes)
+
+def get_illegal_set(root: SyntaxNode) -> set:
+    parent = root.get_last()
+    sibling = root.get_sibling()
+    illegal_set = SyntaxNode.illegal[parent.value]
+    if parent.value in {'+', '-', '/'}:
+        if sibling != None:
+            if sibling.value in {'const', 'var'}:
+                illegal_set.add(sibling.value)
+    if parent.value == '*':
+        if sibling != None:
+            if sibling.value in {'const', 'log', 'exp'}:
+                illegal_set.add(sibling.value)
+    if child_of(parent, {'sin', 'cos', 'log', 'exp'}):
+        illegal_set |= {'sin', 'cos', 'log', 'exp'}
+        if parent.value in {'sin', 'cos', 'log', 'exp'}:
+            illegal_set.add('const')
+    return illegal_set
+
+if __name__ == '__main__':
     print('reconstruction test:')
     root2 = SyntaxNode("start")
     assert root2.from_preorder(['exp','+','*','const','var','const']) == []
@@ -330,3 +380,37 @@ if __name__ == '__main__':
         print(l.value, l.n_args)
     print(get_expression(root))
     print(tree_complete(root))
+
+
+    print("Illegal set test:")
+    root.__del__()
+    root = SyntaxNode('start')
+    preorder = ['exp', '+', '*', 'var', 'const']
+    for op in preorder:
+        root.append(op)
+        print(get_expression_refactor(root))
+        print(get_illegal_set(root))
+
+    print("Child of Test:")
+    root.__del__()
+    root = SyntaxNode('start')
+    root.append('exp')
+    root.append('+')
+    root.append('*')
+    root.append('const')
+    root.append('var')
+    print(root.get_last().value)
+    print(root.get_last().parent.value)
+    print(child_of(root.get_last(), {'exp'}))
+
+    root.__del__()
+    root = SyntaxNode('start')
+    root.append('+')
+    print(root.get_last().value)
+    print(get_illegal_set(root))
+
+    print("Tree depth test:")
+    root.__del__()
+    root = SyntaxNode('start')
+    root.from_preorder(['exp', '+', '*', 'const', 'var', 'const'])
+    print(get_tree_depth(root))

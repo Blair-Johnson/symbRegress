@@ -87,10 +87,12 @@ def main(args):
             #       - improve illegal node checking to incorporate greater
             #       context
 
-            # query parent of next node
-            parent_node = tree.get_last()
+            # get illegal set
+            print(get_expression_refactor(tree))
+            illegal_set = get_illegal_set(tree)
+            print(f'step: {step}, illegal_set: {illegal_set}')
             # convert illegal node names into indices
-            illegal_nodes = [list(SyntaxNode.op_list.keys()).index(node) for node in parent_node.illegal]
+            illegal_nodes = [list(SyntaxNode.op_list.keys()).index(node) for node in illegal_set]
             # zero probability of illegal nodes
             for index in illegal_nodes:
                 pi_dist[0, index] = 0
@@ -100,7 +102,10 @@ def main(args):
             node = pi_dist_obj.sample()
 
             # get next state, reward, done from environment based on action
+            print(list(SyntaxNode.op_list.keys())[node])
             tree.append(list(SyntaxNode.op_list.keys())[node], hidden_state_1.detach())
+            print(get_expression_refactor(tree))
+            print(get_illegal_set(tree))
             # NOTE:
             # during exploration, this hidden state can be detached from computation graph.
             # in the policy update, the tree will need to be repopulated with 'live'
@@ -142,9 +147,9 @@ def main(args):
                         #exceeds_max_depth = True
                 else:
                     print('Function not parameterized')
-                    #reward = 1 / (1 + torch.mean(torch.pow(tree.get_function(x_test[0,0].cpu()) - x_test[0,1].cpu(), 2)))
-                    #print(f'reward: {reward}')
-                    reward = torch.tensor(-1)
+                    reward = 1 / (1 + torch.mean(torch.pow(tree.get_function(x_test[0,0].cpu()) - x_test[0,1].cpu(), 2)))
+                    print(f'reward: {reward}')
+                    #reward = torch.tensor(-1)
                     exit = True
                     #exceeds_max_depth = True
             elif get_tree_depth(tree) >= args.max_depth:
