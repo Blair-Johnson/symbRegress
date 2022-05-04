@@ -28,7 +28,8 @@ parser = argparse.ArgumentParser()
 # number of episodes to run
 parser.add_argument('--num_episodes', type=int, default=1000)
 # maximum search depth
-parser.add_argument('--max_depth', type=int, default=12)
+parser.add_argument('--max_depth', type=int, default=10)
+parser.add_argument('--min_depth', type=int, default=3)
 # risk threshold for policy gradient calculation
 # parser.add_argument('--r_epsilon', type=float, default=9.0)
 # log directory
@@ -51,6 +52,8 @@ def main(args):
         
         # 1. get initial batch of data from dataloader
         func_index = random.randint(1,8)
+        # MANUAL NGUYEN 1 FOR TESTING
+        func_index = 1
         x_train, x_test, z_train, z_test = gen_datasets(f'Nguyen-{func_index}', 2022, 6254)
         x_train = torch.tensor(np.stack([x_train, z_train])).view(1, 2, -1).to(DEVICE).float()
         x_test = torch.tensor(np.stack([x_test, z_test])).view(1, 2, -1).to(DEVICE).float()
@@ -119,33 +122,39 @@ def main(args):
                         # fit function...
                         # TODO: Figure out if it's even worth it to do this on the gpu, or keep it on the cpu
                         #SyntaxNode.parameters[tree.tree_idx] = [param.to(DEVICE) for param in SyntaxNode.parameters[tree.tree_idx]]
-                        func_optim = torch.optim.Adam(SyntaxNode.parameters[tree.tree_idx], lr = FUNC_LR)
-                        for i in range(FUNC_OPTIM_STEPS):
-                            func_optim.zero_grad()
-                            func_loss = torch.mean(torch.pow(tree.get_function(x_train[0,0].cpu()) - x_train[0,1].cpu(), 2))
-                            func_loss.backward()
-                            func_optim.step()
-                            if (i % 100) == 0:
-                                print(f'Fitting func: {func_loss.item()}')
-                        # calculate reward based on inverse of L2 norm between f(x) and y
-                        reward = 1 / (1 + torch.mean(torch.pow(tree.get_function(x_test[0,0].cpu()) - x_test[0,1].cpu(), 2)))
-                        print(f'reward: {reward}')
-                        exit = True
+                        if get_tree_depth(tree) < args.min_depth:
+                            reward = torch.tensor(-1)
+                            exit = True
+                        else:
+                            func_optim = torch.optim.Adam(SyntaxNode.parameters[tree.tree_idx], lr = FUNC_LR)
+                            for i in range(FUNC_OPTIM_STEPS):
+                                func_optim.zero_grad()
+                                func_loss = torch.mean(torch.pow(tree.get_function(x_train[0,0].cpu()) - x_train[0,1].cpu(), 2))
+                                func_loss.backward()
+                                func_optim.step()
+                                if (i % 100) == 0:
+                                    print(f'Fitting func: {func_loss.item()}')
+                            # calculate reward based on inverse of L2 norm between f(x) and y
+                            reward = 1 / (1 + torch.mean(torch.pow(tree.get_function(x_test[0,0].cpu()) - x_test[0,1].cpu(), 2)))
+                            print(f'reward: {reward}')
+                            exit = True
                     else:
                         print('Function is constant')
                         exit = True
                         # haven't exceeded max depth, but we'll use this to skip to the next episode
-                        exceeds_max_depth = True
+                        reward = torch.tensor(-1)
+                        #exceeds_max_depth = True
                 else:
                     print('Function not parameterized')
-                    reward = 1 / (1 + torch.mean(torch.pow(tree.get_function(x_test[0,0].cpu()) - x_test[0,1].cpu(), 2)))
-                    print(f'reward: {reward}')
+                    #reward = 1 / (1 + torch.mean(torch.pow(tree.get_function(x_test[0,0].cpu()) - x_test[0,1].cpu(), 2)))
+                    #print(f'reward: {reward}')
+                    reward = torch.tensor(-1)
                     exit = True
-                    exceeds_max_depth = True
+                    #exceeds_max_depth = True
             elif get_tree_depth(tree) >= args.max_depth:
                 print('Max depth exceeded.')
                 reward = torch.tensor(-1)
-                exceeds_max_depth = True
+                #exceeds_max_depth = True
                 exit = True
             else:
                 reward = torch.tensor(-1)
@@ -189,11 +198,13 @@ def main(args):
         # calculate Bellman discounted rewards
         if len(reward_history) > 1:
             bellman_rewards = []
-            reward_sum = reward_history.pop(-1)
-            bellman_rewards.append(reward_sum)
-            for reward in reward_history:
-                reward_sum += reward + BELLMAN_GAMMA * reward_sum
-                bellman_rewards.append(reward_sum)
+            #reward_sum = reward_history.pop(-1)
+            #bellman_rewards.append(reward_sum)
+            #for reward in reward_history:
+            #    reward_sum += reward + BELLMAN_GAMMA * reward_sum
+            #    bellman_rewards.append(reward_sum)
+            for i in range(len(reward_history)):
+                bellman_rewards.append(reward_history[-i]*BELLMAN_GAMMA**i)
             bellman_rewards.reverse()
             bellman_rewards = np.array(bellman_rewards)
             if np.isnan(np.sum(bellman_rewards)):
