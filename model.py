@@ -41,46 +41,6 @@ class SyntaxTreeLSTM(nn.Module):
             out = self.conv3(out)
             out = self.flatten(out)
             return out.shape[-1]
-    
-    # def stop_criterion(self, tree: SyntaxNode) -> bool:
-    #     '''Test to see if tree is complete'''
-    #     leaf_list = tree.get_leaf_nodes()
-    #     for leaf in leaf_list:
-    #         if leaf.n_args != 0:
-    #             return False
-    #     return True
-
-
-    # def update_tree(self, tree: SyntaxNode, model_dist: torch.tensor) -> Tuple[SyntaxTree, 
-    #                                                                            torch.tensor,
-    #                                                                            torch.tensor]:
-    #     '''Sample new token from distribution, ignore illegal choices, update tree'''
-    #     # make model_dist probabilities
-    #     model_dist = nf.softmax(model_dist, axis=0)
-    #     # get last node in tree
-    #     last_node = tree.get_last()
-    #     # get list of node names thay may not follow the last node
-    #     illegal_nodes = last_node.illegal[last_node.value]
-    #     # convert node names to node indices
-    #     illegal_nodes = [OP_NAMES.find(name) for name in illegal_nodes]
-    #     # zero out the logit probabilities for illegal next nodes
-    #     for index in illegal_nodes:
-    #         model_dist[index] = 0
-    #     # get the tree preorder
-    #     preorder = tree.get_preorder()
-    #     # sample a new node from the logit distribution and add to preorder
-    #     dist = Categorical(model_dist)
-    #     action = dist.sample()
-    #     log_prob = dist.log_prob(action)
-    #     preorder.append(OP_NAMES[action.item()])
-    #     # reconstruct tree from the updated preorder
-    #     tree = tree_from_preorder(preorder)
-    #     return tree, action, log_prob
-
-
-
-    # def get_parent_sibling(self, tree: SyntaxNode) -> torch.tensor:
-    #     '''take tree and return the parent and sibling of next node in traversal'''
         
 
     def forward(self, 
