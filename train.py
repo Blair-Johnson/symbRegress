@@ -53,7 +53,7 @@ def main(args):
         # 1. get initial batch of data from dataloader
         func_index = random.randint(1,8)
         # MANUAL NGUYEN 1 FOR TESTING
-        func_index = 1
+        #func_index = 1
         x_train, x_test, z_train, z_test = gen_datasets(f'Nguyen-{func_index}', 2022, 6254)
         x_train = torch.tensor(np.stack([x_train, z_train])).view(1, 2, -1).to(DEVICE).float()
         x_test = torch.tensor(np.stack([x_test, z_test])).view(1, 2, -1).to(DEVICE).float()
@@ -80,13 +80,12 @@ def main(args):
                 node_logits, hidden_state_1, cell_state_1 = policy_model(cell_state_0,
                                                                          node_embed_0,
                                                                          x = x_train)
-            # create discrete policy distribution (TODO: Double check this is the correct dim)
+            # create discrete policy distribution
             pi_dist = F.softmax(node_logits, dim=-1)
 
             # TODO: Zero elements of the distribution that correspond to illegal nodes
-            #       - query tree for parent and sibling nodes
-            #       - query tree for illegal nodes based on parent
-            #       - set corresponding elements of pi_dist to zero
+            #       - improve illegal node checking to incorporate greater
+            #       context
 
             # query parent of next node
             parent_node = tree.get_last()
@@ -101,9 +100,6 @@ def main(args):
             node = pi_dist_obj.sample()
 
             # get next state, reward, done from environment based on action
-            # TODO:
-            # - append new syntax node to syntax tree (containing hidden state)
-            # - implement append function and add embedding member to tree
             tree.append(list(SyntaxNode.op_list.keys())[node], hidden_state_1.detach())
             # NOTE:
             # during exploration, this hidden state can be detached from computation graph.
@@ -158,11 +154,6 @@ def main(args):
                 exit = True
             else:
                 reward = torch.tensor(-1)
-            # TODO:
-            # - get next parent node type, parent node hidden state
-            # - get next sibling node type
-            # - if tree complete, generate function and fit constants to data
-            #   - then evaluate reward function based on L2 norm
 
             # update state history with policy model inputs
             # TODO: Don't need all of these, only the first
@@ -184,7 +175,6 @@ def main(args):
                 break
             
             # step states for next iteration
-            # TODO: break these off from computation graph
             cell_state_0 = cell_state_1
             node_embed_0 = tree.get_sibling_token().to(DEVICE).float()
             hidden_state_0 = tree.get_parent_state()
@@ -208,13 +198,15 @@ def main(args):
             bellman_rewards.reverse()
             bellman_rewards = np.array(bellman_rewards)
             if np.isnan(np.sum(bellman_rewards)):
-                print('NaN reward, skipping episode')
-                continue
+                print('NaN reward, negative ones')
+                bellman_rewards = np.array([-1*BELLMAN_GAMMA**i for i in
+                reversed(range(len(reward_history)))])
 
             # normalize rewards
             mu = np.mean(bellman_rewards)
             sigma = np.std(bellman_rewards)
-            bellman_rewards = (bellman_rewards - mu) / sigma
+            if sigma > 0:
+                bellman_rewards = (bellman_rewards - mu) / sigma
 
             # replace reward history with normalized bellman rewards
             reward_history = list(bellman_rewards)
@@ -230,11 +222,6 @@ def main(args):
         tree.__del__()
         tree = SyntaxNode('start')
         for traj_step in range(len(state_history)):
-            #tree.__del__()
-            # init a new tree, will step through cumulative tree iterations
-            # this is necessary because each optimizer step will change the policy model,
-            # thus tree must be reconstructed with the new policy model each time
-            #tree = SyntaxNode('start')
 
             # read (s,a,r) from history for the end state of this partial trajectory
             state = state_history[traj_step]
@@ -269,39 +256,6 @@ def main(args):
         optimizer.step()
         print('optim step.')
 
-            # # zero model optimizer gradient for training
-            # optimizer.zero_grad()
-
-            # build tree through inference to current state
-    #                 for train_step in range(history_step + 1):
-    #                     # ex: hist -> [exp, +, var, const]
-    #                     # hist step 0 -> training steps: [exp]
-    #                     # hist step 1 -> training steps: [exp, +]
-    #                     # hist step 2 -> training steps: [exp, +, var]
-
-    #                     sibling_token = tree.get_sibling_token()
-    #                     parent_hidden = tree.get_parent_state()
-
-    #                     if train_step != 0:
-    #                         node_logits, hidden_state, cell_state = model(cell_state,
-    #                                                                       sibling_token,
-    #                                                                       hidden_state_0 = parent_hidden)
-    #                     else:
-    #                         # initial function data and state vectors
-    #                         node_logits, hidden_state, cell_state = model(*state_history[0])
-
-    #                     # retaining hidden state within torch graph, allows lstm to backprop through time
-    #                     tree.append(SyntaxNode.op_list.keys()[action_history[train_step]], hidden_state)
-
-    #                 pi_dist = F.softmax(node_logits, dim=-1)
-    #                 pi_dist = Categorical(pi_dist)
-    #                 # gradients propogate through likelihood function back to model and hidden state structure
-    #                 # TODO: Modify to include baseline term
-    #                 loss = -pi_dist.log_prob(action) * reward
-    #                 loss.backward()
-    #                 # possibly de-indent optim.step() if we want gradients to accumulate and then step after whole trajectory
-    #                 # this would eliminate the need for the inner training loop
-    #                 optimizer.step()
 
 if __name__ == '__main__':
     args = parser.parse_args()

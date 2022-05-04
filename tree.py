@@ -4,9 +4,7 @@ import torch.nn.functional as F
 
 from typing import Callable, Tuple, Union, List
 
-# TODO: Need the ability to 'append' a new node in preorder without reconstructing the whole tree
-# TODO: Need to add member variable for node embeddings within tree
-# TODO: Need to get tree depth -> Done
+# TODO: Need better system for determining what nodes are illegal to add
 
 class SyntaxNode(object):
     # stored op properties in class attribute
