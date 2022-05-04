@@ -24,6 +24,8 @@ POLICY_LR = 1e-3
 FUNC_OPTIM_STEPS = 1000
 BELLMAN_GAMMA = .95
 
+ILLEGAL_NODES = {'sin', 'cos', 'log', 'exp', '/', '-'}
+
 parser = argparse.ArgumentParser()
 # number of episodes to run
 parser.add_argument('--num_episodes', type=int, default=1000)
@@ -88,9 +90,8 @@ def main(args):
             #       context
 
             # get illegal set
-            print(get_expression_refactor(tree))
             illegal_set = get_illegal_set(tree)
-            print(f'step: {step}, illegal_set: {illegal_set}')
+            illegal_set |= ILLEGAL_NODES
             # convert illegal node names into indices
             illegal_nodes = [list(SyntaxNode.op_list.keys()).index(node) for node in illegal_set]
             # zero probability of illegal nodes
@@ -102,10 +103,8 @@ def main(args):
             node = pi_dist_obj.sample()
 
             # get next state, reward, done from environment based on action
-            print(list(SyntaxNode.op_list.keys())[node])
             tree.append(list(SyntaxNode.op_list.keys())[node], hidden_state_1.detach())
-            print(get_expression_refactor(tree))
-            print(get_illegal_set(tree))
+            
             # NOTE:
             # during exploration, this hidden state can be detached from computation graph.
             # in the policy update, the tree will need to be repopulated with 'live'
@@ -143,8 +142,8 @@ def main(args):
                         print('Function is constant')
                         exit = True
                         # haven't exceeded max depth, but we'll use this to skip to the next episode
-                        reward = torch.tensor(-1)
-                        #exceeds_max_depth = True
+                        reward = torch.tensor(0) #-1
+                        exceeds_max_depth = True
                 else:
                     print('Function not parameterized')
                     reward = 1 / (1 + torch.mean(torch.pow(tree.get_function(x_test[0,0].cpu()) - x_test[0,1].cpu(), 2)))
@@ -152,13 +151,13 @@ def main(args):
                     #reward = torch.tensor(-1)
                     exit = True
                     #exceeds_max_depth = True
-            elif get_tree_depth(tree) >= args.max_depth:
+            elif get_tree_depth(tree) > args.max_depth:
                 print('Max depth exceeded.')
-                reward = torch.tensor(-1)
-                #exceeds_max_depth = True
+                reward = torch.tensor(0) #-1
+                exceeds_max_depth = True
                 exit = True
             else:
-                reward = torch.tensor(-1)
+                reward = torch.tensor(0) #-1
 
             # update state history with policy model inputs
             # TODO: Don't need all of these, only the first

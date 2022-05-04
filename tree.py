@@ -286,20 +286,22 @@ def child_of(node: SyntaxNode, nodetypes: set) -> bool:
 def get_illegal_set(root: SyntaxNode) -> set:
     parent = root.get_last()
     sibling = root.get_sibling()
-    illegal_set = SyntaxNode.illegal[parent.value]
+    # copying the set is important, otherwise we modify the illegal sets for
+    # each node globally
+    illegal_nodes = SyntaxNode.illegal[parent.value].copy()
     if parent.value in {'+', '-', '/'}:
         if sibling != None:
             if sibling.value in {'const', 'var'}:
-                illegal_set.add(sibling.value)
+                illegal_nodes.add(sibling.value)
     if parent.value == '*':
         if sibling != None:
             if sibling.value in {'const', 'log', 'exp'}:
-                illegal_set.add(sibling.value)
+                illegal_nodes.add(sibling.value)
     if child_of(parent, {'sin', 'cos', 'log', 'exp'}):
-        illegal_set |= {'sin', 'cos', 'log', 'exp'}
+        illegal_nodes |= {'sin', 'cos', 'log', 'exp'}
         if parent.value in {'sin', 'cos', 'log', 'exp'}:
-            illegal_set.add('const')
-    return illegal_set
+            illegal_nodes.add('const')
+    return illegal_nodes
 
 if __name__ == '__main__':
     print('reconstruction test:')
